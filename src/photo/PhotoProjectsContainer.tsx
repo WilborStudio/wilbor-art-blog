@@ -212,9 +212,10 @@ const MediaItem = ({
         };
     }, [isExpanded]);
 
-    // Fecha fullscreen com ESC, navega com setas esquerda/direita e bloqueia scroll do body enquanto aberto
+    // Fecha fullscreen com ESC, navega com setas esquerda/direita e bloqueia scroll de fundo enquanto aberto
     useEffect(() => {
         if (typeof window === 'undefined') return;
+
         const onKey = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
                 setIsFullscreen(false);
@@ -231,18 +232,56 @@ const MediaItem = ({
                 }
             }
         };
-        if (isFullscreen) {
-            document.body.style.overflow = 'hidden';
-            window.addEventListener('keydown', onKey);
-        } else {
-            document.body.style.overflow = '';
+
+        if (!isFullscreen) {
             // Reset do índice quando sair do fullscreen
             setCurrentImageIndex(0);
+            return;
         }
+
+        const { body, documentElement } = document;
+        const scrollY = window.scrollY;
+
+        const prevBodyOverflow = body.style.overflow;
+        const prevBodyPosition = body.style.position;
+        const prevBodyTop = body.style.top;
+        const prevBodyLeft = body.style.left;
+        const prevBodyRight = body.style.right;
+        const prevBodyWidth = body.style.width;
+
+        const prevDocOverflow = documentElement.style.overflow;
+        const prevDocOverscroll = documentElement.style.overscrollBehavior;
+        const prevBodyOverscroll = body.style.overscrollBehavior;
+
+        documentElement.style.overflow = 'hidden';
+        documentElement.style.overscrollBehavior = 'none';
+        body.style.overflow = 'hidden';
+        body.style.overscrollBehavior = 'none';
+
+        // iOS/Android: fixa o body para impedir scroll de fundo durante fullscreen
+        body.style.position = 'fixed';
+        body.style.top = `-${scrollY}px`;
+        body.style.left = '0';
+        body.style.right = '0';
+        body.style.width = '100%';
+
+        window.addEventListener('keydown', onKey);
+
         return () => {
             window.removeEventListener('keydown', onKey);
-            document.body.style.overflow = '';
-        };
+
+            documentElement.style.overflow = prevDocOverflow;
+            documentElement.style.overscrollBehavior = prevDocOverscroll;
+            body.style.overflow = prevBodyOverflow;
+            body.style.overscrollBehavior = prevBodyOverscroll;
+            body.style.position = prevBodyPosition;
+            body.style.top = prevBodyTop;
+            body.style.left = prevBodyLeft;
+            body.style.right = prevBodyRight;
+            body.style.width = prevBodyWidth;
+
+            window.scrollTo(0, scrollY);
+        }
     }, [isFullscreen, images.length]);
     function getThumbnailUrl(item: Media): string | null {
         try {
@@ -686,7 +725,7 @@ const MediaItem = ({
             {/* Modal fullscreen renderizado via Portal fora do card */}
             {mounted && isFullscreen && typeof window !== 'undefined' && createPortal(
                 <div
-                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95 backdrop-blur-sm"
+                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95"
                     onClick={() => setIsFullscreen(false)}
                     style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
                 >
@@ -704,7 +743,7 @@ const MediaItem = ({
                     </button>
 
                     <div
-                        className="w-full h-full max-w-7xl px-4 sm:px-8 py-16 sm:py-20 flex items-center justify-center"
+                        className="w-full h-[100dvh] max-w-none px-0 py-0 flex items-center justify-center lg:max-w-7xl lg:px-8 lg:py-20"
                         onClick={e => e.stopPropagation()}
                         style={{ position: 'relative', zIndex: 1 }}
                     >
