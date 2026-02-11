@@ -16,8 +16,9 @@ import { Media, PhotoGridContainerProps } from './components/types';
 
 const formatPinataUrl = (url: string): string => {
     if (!url) return '';
+    // Mantém query params (ex: pinataGatewayToken), pois alguns gateways exigem token.
     if (url.includes('pinataGatewayToken')) {
-        return url.split('?')[0];
+        return url.trim().replace(/['"]+/g, '');
     }
     if (url.includes('images.hive.blog')) {
         return url.trim().replace(/['"]+/g, '');
@@ -749,16 +750,17 @@ const MediaItem = ({
             {/* Modal fullscreen renderizado via Portal fora do card */}
             {mounted && isFullscreen && typeof window !== 'undefined' && createPortal(
                 <div
-                    className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/95"
+                    className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center"
                     onClick={() => setIsFullscreen(false)}
                     style={{
                         position: 'fixed',
                         top: 0,
                         left: 0,
                         right: 0,
-                        bottom: 0,
+                        width: '100vw',
                         height: 'var(--fullscreen-vh, 100svh)',
                         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                        backgroundColor: '#000',
                     }}
                 >
                     {/* Botão de fechar no topo direito */}

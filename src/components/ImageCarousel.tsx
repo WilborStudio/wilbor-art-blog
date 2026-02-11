@@ -84,6 +84,7 @@ export default function ImageCarousel({ images, fullscreen = false, inExpandedCa
   const touchStartY = useRef<number | null>(null);
   const [imgRatios, setImgRatios] = useState<Record<string, number>>({});
   const [imgHasBars, setImgHasBars] = useState<Record<string, boolean | null>>({});
+  const [imgSrcOverrides, setImgSrcOverrides] = useState<Record<string, string>>({});
   const preloadedRef = useRef<Record<string, boolean>>({});
 
   // Ajuste de cor das bolinhas conforme o tema (pedido do layout)
@@ -201,7 +202,7 @@ export default function ImageCarousel({ images, fullscreen = false, inExpandedCa
     offset = translateX < 0 ? -2 * slideWidth : 0;
   }
 
-  const borderRadius = fullscreen ? undefined : 16;
+  const borderRadius = fullscreen ? undefined : 20;
   const containerHeight = fullscreen ? '100%' : 'auto';
   const baseAspectRatio = '16 / 9';
   const detectBlackBars = (imgEl: HTMLImageElement): boolean | null => {
@@ -312,16 +313,16 @@ export default function ImageCarousel({ images, fullscreen = false, inExpandedCa
 
   return (
     <div 
-      className={fullscreen ? "fixed inset-0 z-50" : inExpandedCard ? "relative w-full flex flex-col items-center" : "relative w-full flex flex-col items-center my-6"}
-      style={fullscreen ? { margin: 0, padding: 0, width: '100%', height: 'var(--fullscreen-vh, 100svh)' } : (inExpandedCard && !fullscreen ? { marginTop: '0', marginBottom: '0' } : undefined)}
+      className={fullscreen ? "fixed top-0 left-0 right-0 z-50" : inExpandedCard ? "relative w-full flex flex-col items-center" : "relative w-full flex flex-col items-center my-6"}
+      style={fullscreen ? { margin: 0, padding: 0, width: '100vw', height: 'var(--fullscreen-vh, 100svh)' } : (inExpandedCard && !fullscreen ? { marginTop: '0', marginBottom: '0' } : undefined)}
     >
       <div
         className={
           fullscreen 
             ? "w-full h-full flex justify-center items-center overflow-hidden bg-black"
             : inExpandedCard
-              ? "w-full flex justify-center items-center max-w-full mx-auto overflow-hidden rounded-lg bg-transparent"
-              : "w-full flex justify-center items-center max-w-full mx-auto overflow-hidden rounded-lg bg-transparent"
+              ? "w-full flex justify-center items-center max-w-full mx-auto overflow-hidden rounded-2xl bg-black"
+              : "w-full flex justify-center items-center max-w-full mx-auto overflow-hidden rounded-2xl bg-black"
         }
         style={{
           background: useBlackBg ? 'black' : 'transparent',
@@ -356,22 +357,18 @@ export default function ImageCarousel({ images, fullscreen = false, inExpandedCa
           }}
         >
           {imagesToShow.map((img, idx) => {
+            const resolvedSrc = imgSrcOverrides[img.src] || img.src;
             const ratio = imgRatios[img.src];
             const isPortrait = ratio ? ratio < 1 : false;
             const isLandscape = ratio ? ratio > 1.05 : false;
             const isActiveSlide = idx === 1;
             const barsKnown = imgHasBars[img.src] !== undefined;
             const hasBars = imgHasBars[img.src] === true;
-            // No card expandido, sempre prioriza contain para evitar corte.
-            const forceCrop = !inExpandedCard && isLandscape && hasBars;
-            const innerAspectRatio = fullscreen ? undefined : ((inExpandedCard && !forceCrop) || isPortrait ? undefined : baseAspectRatio);
-            const objectFit = fullscreen
-              ? 'contain'
-              : (inExpandedCard && !forceCrop) || isPortrait
-                ? 'contain'
-                : 'cover';
-            const imgHeight = fullscreen ? '100%' : ((inExpandedCard && !forceCrop) || isPortrait ? 'auto' : '100%');
-            const imgMaxHeight = fullscreen ? '100%' : ((inExpandedCard && !forceCrop) || isPortrait ? 'none' : '100%');
+            const forceCrop = false;
+            const innerAspectRatio = undefined;
+            const objectFit = 'contain';
+            const imgHeight = fullscreen ? '100%' : 'auto';
+            const imgMaxHeight = fullscreen ? '100%' : '100%';
             const zoomScale = getFullscreenZoom(ratio, imgHasBars[img.src]);
             const baseScale = forceCrop ? 1.08 : 1;
             const finalScale = Math.max(baseScale, zoomScale);
@@ -409,6 +406,7 @@ export default function ImageCarousel({ images, fullscreen = false, inExpandedCa
                 aspectRatio: innerAspectRatio,
                 borderRadius,
                 overflow: 'hidden',
+                background: fullscreen ? 'transparent' : '#000',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
@@ -416,7 +414,7 @@ export default function ImageCarousel({ images, fullscreen = false, inExpandedCa
               }}
             >
               <img
-                 src={img.src}
+                 src={resolvedSrc}
                  alt={img.alt || ''}
                  className={fullscreen ? '' : 'shadow-lg'}
                  loading={fullscreen && !isActiveSlide ? 'lazy' : 'eager'}
@@ -436,6 +434,7 @@ export default function ImageCarousel({ images, fullscreen = false, inExpandedCa
                    background: 'transparent',
                    margin: '0',
                    borderRadius,
+                   clipPath: fullscreen ? undefined : `inset(0 round ${borderRadius}px)`,
                    willChange: fullscreen ? 'transform' : undefined,
                  }}
                  onLoad={(e) => {
@@ -443,6 +442,16 @@ export default function ImageCarousel({ images, fullscreen = false, inExpandedCa
                    if (!naturalWidth || !naturalHeight) return;
                    const nextRatio = naturalWidth / naturalHeight;
                    setImgRatios((prev) => (prev[img.src] ? prev : { ...prev, [img.src]: nextRatio }));
+                 }}
+                 onError={() => {
+                   setImgSrcOverrides((prev) => {
+                     if (prev[img.src]) return prev;
+                     // Fallback para proxy Hive quando gateway original falhar (404/timeout).
+                     return {
+                       ...prev,
+                       [img.src]: `https://images.hive.blog/0x0/${img.src}`,
+                     };
+                   });
                  }}
                  draggable={false}
                />
